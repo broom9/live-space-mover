@@ -12,6 +12,7 @@ General Public License: http://www.gnu.org/copyleft/gpl.html
 
 __VERSION__="0.1"
 
+import sys
 import xmlrpclib
 import urllib2
 from BeautifulSoup import BeautifulSoup
@@ -103,7 +104,7 @@ def find1stPermalink(srcURL):
     
 def main():
     #main procedure begin
-    usage = "usage: %prog [options] arg"
+    usage = "usage: %prog -s sourceurl -d desturl -u username -p password [-x proxy][-b][-l limit]"
     parser = OptionParser(usage)
     parser.add_option("-s","--source",action="store", type="string",dest="srcURL",default="http://yourspaceid.spaces.live.com/",help="source msn/live space address")
     parser.add_option("-d","--dest",action="store",type="string",dest="destURL",default="http://your.wordpress.blog.com/xmlrpc.php",help="destination wordpress blog address (must point to xmlrpc.php)")
