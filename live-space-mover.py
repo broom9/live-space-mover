@@ -10,7 +10,7 @@ Released under the GPL. Report bugs to weiwei9@gmail.com
 General Public License: http://www.gnu.org/copyleft/gpl.html
 """
 
-__VERSION__="0.1"
+__VERSION__="0.2"
 
 import sys
 import xmlrpclib
@@ -25,7 +25,7 @@ from optparse import OptionParser
 logging.basicConfig(level=10);
 
     
-def fetchEntry(url):
+def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p'):
     logging.debug("begin fetch page %s",url)
     page = urllib2.urlopen(url)
     soup = BeautifulSoup(page)
@@ -45,7 +45,7 @@ def fetchEntry(url):
     if temp :
         timeStr = temp.span.string.strip()
         i['date']+= (' '+timeStr)
-        i['date'] = datetime.strptime(i['date'],'%m/%d/%Y %I:%M %p')
+        i['date'] = datetime.strptime(i['date'],datetimePattern)
         logging.debug("found time %s",i['date'])
     else :
         print "Can't find time or can't parse datetime"
@@ -104,13 +104,14 @@ def find1stPermalink(srcURL):
     
 def main():
     #main procedure begin
-    usage = "usage: %prog -s sourceurl -d desturl -u username -p password [-x proxy][-b][-l limit]"
-    parser = OptionParser(usage)
+    parser = OptionParser()
     parser.add_option("-s","--source",action="store", type="string",dest="srcURL",default="http://yourspaceid.spaces.live.com/",help="source msn/live space address")
+    parser.add_option("-f","--startfrom",action="store", type="string",dest="startfromURL",help="a permalink in source msn/live space address for starting with, if this is specified, srcURL will be ignored.")    
     parser.add_option("-d","--dest",action="store",type="string",dest="destURL",default="http://your.wordpress.blog.com/xmlrpc.php",help="destination wordpress blog address (must point to xmlrpc.php)")
     parser.add_option("-u","--user",action="store",type="string",dest="user",default="yourusername",help="username for logging into destination wordpress blog")
     parser.add_option("-p","--password",action="store",type="string",dest="passw",default="yourpassword",help="password for logging into destination wordpress blog")
-    parser.add_option("-x","--proxy",action="store",type="string",dest="proxy",help="http proxy server, only for connecting live space.I don't know how to add proxy for metaWeblog yet")
+    parser.add_option("-x","--proxy",action="store",type="string",dest="proxy",help="http proxy server, only for connecting live space.I don't know how to add proxy for metaWeblog yet. So this option is probably not useful...")
+    parser.add_option("-t","--datetimepattern",action="store",dest="datetimepattern",default="%m/%d/%Y %I:%M %p",help="The datetime pattern of livespace, default to be %m/%d/%Y %I:%M %p. Check http://docs.python.org/lib/module-time.html for time formatting codes. Make sure to quote the value in command line.")
     parser.add_option("-b","--draft",action="store_false",dest="draft",default=True,help="as published posts or drafts after transfering,default to be published directly")
     parser.add_option("-l","--limit",action="store",type="int",dest="limit",help="limit number of transfered posts, you can use this option to test")
     (options, args) = parser.parse_args()
@@ -140,11 +141,14 @@ def main():
         print " - your weblog doesn't like the username/password combination you've provided."
         sys.exit(2)
     #connect src blog and find first permal link
-    permalink = find1stPermalink(srcURL)
+    if startfromURL :
+    	permalink = startfromURL
+    else :
+    	permalink = find1stPermalink(srcURL)
     #main loop, retrieve every blog entry and post to dest blog
     count = 0
     while permalink:
-        i=fetchEntry(permalink)
+        i=fetchEntry(permalink,datetimepattern)
         if 'title' in i:
             logging.info("Got a blog entry titled %s successfully",i['title'])
         wpost = {}
@@ -153,7 +157,11 @@ def main():
         wpost['dateCreated']=i['date']
         publish(server,blogid,user,passw,wpost,draft)
         logging.info("Published the blog entry successfully")
-        if 'permalLink' in i : permalink = i['permalLink']
+        logging.info("-----------------------")
+        if 'permalLink' in i :
+        	permalink = i['permalLink']
+        else :
+        	break
         count+=1
         if limit and count >= limit : break
     print "Finished! Congratulations!"
