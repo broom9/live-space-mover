@@ -15,7 +15,7 @@ __VERSION__="0.2"
 import sys
 import xmlrpclib
 import urllib2
-from BeautifulSoup import BeautifulSoup
+from BeautifulSoup import BeautifulSoup,Tag
 import re
 import logging
 from datetime import datetime
@@ -68,14 +68,20 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p'):
     #comments
     temp = soup.findAll(attrs={"class":"bvCommentText bvwordwrap"})
     if temp :
-        i.comments = []
+        i['comments'] = []
         for cmDiv in temp:
             comment = {}
-            comment['author']=cmDiv.contents[0]
+            if isinstance(cmDiv.contents[0],Tag):
+                comment['email']=cmDiv.contents[0]['href'][8:]
+                comment['author']=cmDiv.contents[0].string
+            else:
+                comment['author']= cmDiv.contents[0]
             comment['content']=''.join(map(str,cmDiv.contents[1]))
             comment['date']=datetime.strptime(cmDiv.contents[2],datetimePattern)
-            
-            i.comments.append(comment)
+            urlTag = cmDiv.contents[2].findNextSibling(name='a')
+            if urlTag:
+                comment['url']=urlTag['href']
+            i['comments'].append(comment)
     return i
 
 def publish(server, blogid, user, passw, wpost,published):
@@ -189,5 +195,6 @@ def main():
     print "Finished! Congratulations!"
 
 if __name__=="__main__":
-    main()
+    #main()
+    print fetchEntry('http://sanaz.spaces.live.com/blog/cns!7C130D76D92F20A3!3678.entry')
 
