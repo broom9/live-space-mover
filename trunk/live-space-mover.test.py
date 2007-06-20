@@ -13,6 +13,7 @@ General Public License: http://www.gnu.org/copyleft/gpl.html
 __VERSION__="0.2"
 
 import sys
+import os
 import xmlrpclib
 import urllib2
 from BeautifulSoup import BeautifulSoup,Tag
@@ -22,6 +23,7 @@ from datetime import datetime
 import time
 from optparse import OptionParser
 from string import Template
+import pickle
 
 logging.basicConfig(level=10);
 
@@ -125,9 +127,12 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p'):
                                 logging.error(ajaxStr)
                 else :
                         needFetchComments = False
+        logging.debug('Got %d comments of this entry'
+                      ,len(i['comments']))
         return i
         
 def getDstBlogEntryList(server, user, passw, maxPostID = 100):
+        logging.info('Fetching dst blog entry list')
         pIdRange = range(1,maxPostID)
         entryDict = {}
         for pId in pIdRange:
@@ -197,6 +202,7 @@ def main():
         parser.add_option("-t","--datetimepattern",action="store",dest="datetimepattern",default="%m/%d/%Y %I:%M %p",help="The datetime pattern of livespace, default to be %m/%d/%Y %I:%M %p. Check http://docs.python.org/lib/module-time.html for time formatting codes. Make sure to quote the value in command line.")
         parser.add_option("-b","--draft",action="store_false",dest="draft",default=True,help="as published posts or drafts after transfering,default to be published directly")
         parser.add_option("-l","--limit",action="store",type="int",dest="limit",help="limit number of transfered posts, you can use this option to test")
+        parser.add_option("-m","--mode",action="store",type="string",dest="mode",default="all",help="Move mode, 'all' or 'commentsOnly'")
         (options, args) = parser.parse_args()
         #export all options variables
         for i in dir(options):
@@ -211,7 +217,8 @@ def main():
         server=xmlrpclib.Server(destURL)
         blogid = int(1)
         try:
-                server.metaWeblog.getUsersBlogs(blogid,user,passw)
+                #server.metaWeblog.getUsersBlogs(blogid,user,passw)
+                pass
         except xmlrpclib.ProtocolError,xmlrpclib.ResponseError:
                 print "Error while checking username",user,". Possible reasons are:"
                 print " - The weblog doesn't exist"
@@ -223,6 +230,23 @@ def main():
                 print " - your weblog doesn't support the MetaWeblog API"
                 print " - your weblog doesn't like the username/password combination you've provided."
                 sys.exit(2)
+        #Load or Fetch dst blog entries dict (title and id)
+        if mode == 'commentsOnly':
+                loadedDump = False
+                if os.path.exists('DstEntryDict.dump') :
+                        try :
+                                f = open('DstEntryDict.dump')
+                                dstBlogEntryDict = pickle.load(f)
+                                f.close()
+                                loadedDump = True
+                        except Exception:
+                                logging.info('Loading DstEntryDict.dump failed, begin to fetch')
+                                loadedDump = False
+                if not loadedDump :
+                        f = open('DstEntryDict.dump','w')
+                        dstBlogEntryDict = getDstBlogEntryList(server,user,passw,1000)
+                        pickle.dump(dstBlogEntryDict)
+                        f.close()
         #connect src blog and find first permal link
         if startfromURL :
                         permalink = startfromURL
@@ -234,11 +258,12 @@ def main():
                 i=fetchEntry(permalink,datetimepattern)
                 if 'title' in i:
                         logging.info("Got a blog entry titled %s successfully",i['title'])
+                
                 wpost = {}
                 wpost['description']=i['content']
                 wpost['title'] = i['title']
                 wpost['dateCreated']=i['date']
-                publish(server,blogid,user,passw,wpost,draft)
+                #publish(server,blogid,user,passw,wpost,draft)
                 logging.info("Published the blog entry successfully")
                 logging.info("-----------------------")
                 if 'permalLink' in i :
@@ -250,6 +275,8 @@ def main():
         print "Finished! Congratulations!"
 
 if __name__=="__main__":
-        print fetchEntry('http://broom9.spaces.live.com/blog/cns!3EB2F0E9A1AE7429!464.entry')
+        #print fetchEntry('http://broom9.spaces.live.com/blog/cns!3EB2F0E9A1AE7429!464.entry')
+        main()
+        
         
 
