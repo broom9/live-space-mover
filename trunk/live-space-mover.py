@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 This script copies entries from a live space (msn space) weblog to an other weblog, using the MetaWeblog API.
-It can move posts now, not supporting comments yet.
+It can move both posts and comments.
 Require 'BeautifulSoup' module
 Released under the GPL. Report bugs to weiwei9@gmail.com
 
