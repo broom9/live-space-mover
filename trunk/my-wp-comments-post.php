@@ -1,8 +1,8 @@
 <?php
 require( dirname(__FILE__) . '/wp-config.php' );
 function my_wp_new_comment( $commentdata ) {
+    remove_filter('comment_flood_filter', 'wp_throttle_comment_flood');
 	$commentdata = apply_filters('preprocess_comment', $commentdata);
-
 	$commentdata['comment_post_ID'] = (int) $commentdata['comment_post_ID'];
 	$commentdata['user_ID']         = (int) $commentdata['user_ID'];
 
@@ -10,8 +10,8 @@ function my_wp_new_comment( $commentdata ) {
 	$commentdata['comment_agent']     = $_SERVER['HTTP_USER_AGENT'];
 
 	$commentdata['comment_date']     = $commentdata['comment_date'];
-	$commentdata['comment_date_gmt'] = $commentdata['comment_date_gmt'];
-
+    $commentdata['comment_date_gmt']     = $commentdata['comment_date'];
+    
 	$commentdata = wp_filter_comment($commentdata);
 
 	$commentdata['comment_approved'] = wp_allow_comment($commentdata);
@@ -29,7 +29,7 @@ function my_wp_new_comment( $commentdata ) {
 		if ( get_option('comments_notify') && $commentdata['comment_approved'] && $post->post_author != $commentdata['user_ID'] )
 			wp_notify_postauthor($comment_ID, $commentdata['comment_type']);
 	}
-
+    add_filter('comment_flood_filter', 'wp_throttle_comment_flood', 10, 3);
 	return $comment_ID;
 }
 nocache_headers();
@@ -54,8 +54,6 @@ $comment_author_email = trim($_POST['email']);
 $comment_author_url   = trim($_POST['url']);
 $comment_content      = trim($_POST['comment']);
 $comment_date         = trim($_POST['date']);
-$comment_date_gmt         = trim($_POST['gmt']);
-
 
 $comment_type = '';
 
@@ -64,13 +62,9 @@ if ( '' == $comment_content )
 	wp_die( __('Error: please type a comment.') );
 
 $commentdata = compact('comment_post_ID', 'comment_author', 'comment_author_email', 'comment_author_url', 'comment_content','comment_date','comment_date_gmt', 'comment_type', 'user_ID');
-
 $comment_id = my_wp_new_comment( $commentdata );
-
 $comment = get_comment($comment_id);
 
-
-
-echo 'Success'
+echo('Success');
 
 ?>
