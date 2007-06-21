@@ -216,6 +216,7 @@ def main():
     parser.add_option("-l","--limit",action="store",type="int",dest="limit",help="limit number of transfered posts, you can use this option to test")
     parser.add_option("-m","--mode",action="store",type="string",dest="mode",default="all",help="Working mode, 'all' or 'commentsOnly'. Default is 'all'. Set it to 'commentsOnly' if you have used earlier version of this script to move posts. Set it to 'postsOnly' if you can't upload the comments-post page to your dest WordPress blog so can't move comments")
     parser.add_option("-c","--postcommentsurl",action="store",type="string",default='',dest="postCommentsURL",help="The URL for posting comments, usually should be the URL of 'my-wp-comments-post.php' provided with this script. If this option isn't set, program will use destURL and the default page name to decide.")    
+    parser.add_option("-max","--maxDstEntryID",action="store",type="int",default='100',dest="maxDstEntryID",help="Use this parameter to specify the MAX post id of your destination blog")    
     (options, args) = parser.parse_args()
     #export all options variables
     for i in dir(options):
@@ -263,7 +264,7 @@ def main():
                 loadedDump = False
         if not loadedDump :
             f = open('DstEntryDict.dump','w')
-            dstBlogEntryDict = getDstBlogEntryList(server,user,passw,580)
+            dstBlogEntryDict = getDstBlogEntryList(server,user,passw,maxDstEntryID)
             pickle.dump(dstBlogEntryDict,f)
             f.close()
             logging.info('Finished Fetching Destination Blog Entries from site, and saved to local for caching')
