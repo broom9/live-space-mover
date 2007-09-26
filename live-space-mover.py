@@ -27,6 +27,7 @@ from optparse import OptionParser
 from string import Template
 import pickle
 import xml
+
 entries = []
 categories = set([])
 commentId = 10000
@@ -94,7 +95,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
         logging.warning("Can't find content")
     #title
     temp = temp.findPreviousSibling()
-    if temp :
+    if temp and temp.string:
        i['title']=temp.string.strip()
        logging.debug("found title %s",i['title'])
     else:
@@ -132,9 +133,9 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                         mailAndName = mailAndName.contents[0]
                     if isinstance(mailAndName,Tag):
                         comment['email']=mailAndName['href'][len('mailto:'):]
-                        comment['author']=mailAndName.string
+                        comment['author']=u''+mailAndName.string
                     else:
-                        comment['author']= mailAndName
+                        comment['author']= u''+mailAndName.string
                     comment['comment']=u''.join(map(CData,cmDiv.contents[1].contents))
                     comment['date']=datetime.strptime(cmDiv.contents[2],datetimePattern).strftime("%Y-%m-%d %H:%M")
                     urlTag = cmDiv.contents[2].findNextSibling(name='a')
@@ -419,6 +420,22 @@ def main():
             pickle.dump(dstBlogEntryDict,f)
             f.close()
             logging.info('Finished Fetching Destination Blog Entries from site, and saved to local for caching')
+    global entries
+    global categories
+    cacheFile = None
+    #If there is a cache file, load it and resume from the last post in it
+    if not startfromURL and os.path.exists('entries.cache'):
+        cacheFile = open('entries.cache','a+')
+        try:
+            while True:
+                entry = pickle.load(cacheFile)
+                logging.info('Load entry from cache file with title %s',entry['title'])
+                entries.append(entry)
+        except (pickle.PickleError,EOFError):
+            logging.info("No more entries in cache file for loading")
+        if len(entries)>0:
+            startfromURL = entries[-1]['permalLink']
+            logging.info("Will start fetching from %s",startfromURL)
     #connect src blog and find first permal link
     if startfromURL :
         permalink = startfromURL
@@ -430,34 +447,37 @@ def main():
         sys.exit(2)
     #main loop, retrieve every blog entry and post to dest blog
     count = 0
-    global entries
-    global categories
-    while permalink:
-        i=fetchEntry(permalink,datetimepattern,mode)
-        if 'title' in i:
-            logging.info("Got a blog entry titled %s successfully",i['title'])
-        if destURL:
-            wpost = {}
-            wpost['description']=i['content']
-            wpost['title'] = i['title']
-            wpost['dateCreated']=i['date']
-            if mode == 'all':
-                pID = publishPost(server,blogid,user,passw,wpost,draft)
-                publishComments(entry=i,pID=pID,postCommentsURL=postCommentsURL)
-            elif mode == 'postsOnly':
-                publishPost(server,blogid,user,passw,wpost,draft)
-            else : #mode='commentsOnly'
-                publishComments(entry=i,dstBlogEntryDict=dstBlogEntryDict,postCommentsURL=postCommentsURL)
-                
-        entries.append(i)
-        logging.debug('Exported entry %s',i['title'])
-        logging.debug("-----------------------")
-        if 'permalLink' in i :
-                permalink = i['permalLink']
-        else :
-                break
-        count+=1
-        if limit and count >= limit : break
+    if not cacheFile:
+        cacheFile = open('entries.cache','w')
+    try:
+        while permalink:
+            i=fetchEntry(permalink,datetimepattern,mode)
+            if 'title' in i:
+                logging.info("Got a blog entry titled %s successfully",i['title'])
+            if destURL:
+                wpost = {}
+                wpost['description']=i['content']
+                wpost['title'] = i['title']
+                wpost['dateCreated']=i['date']
+                if mode == 'all':
+                    pID = publishPost(server,blogid,user,passw,wpost,draft)
+                    publishComments(entry=i,pID=pID,postCommentsURL=postCommentsURL)
+                elif mode == 'postsOnly':
+                    publishPost(server,blogid,user,passw,wpost,draft)
+                else : #mode='commentsOnly'
+                    publishComments(entry=i,dstBlogEntryDict=dstBlogEntryDict,postCommentsURL=postCommentsURL)
+                    
+            entries.append(i)
+            pickle.dump(i,cacheFile)
+            logging.debug("-----------------------")
+            if 'permalLink' in i :
+                    permalink = i['permalLink']
+            else :
+                    break
+            count+=1
+            if limit and count >= limit : break
+    finally:
+        cacheFile.close()
     #get blog info and export header
     blogInfoDic = {}
     if srcURL:
@@ -488,6 +508,9 @@ def main():
     #export Foot
     exportFoot(f)
     logging.debug('Exported footer')
+    #Delete cache file
+    os.remove('entries.cache')
+    logging.info("Deleted cache file")
     logging.info("Finished! Congratulations!")
 
 if __name__=="__main__":
@@ -504,7 +527,12 @@ if __name__=="__main__":
     # tell the handler to use this format
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
-    main()
+    try:
+        main()
+    except:
+        logging.exception("Unexpected error")
+        raise
+
     
     
 
