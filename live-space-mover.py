@@ -78,7 +78,10 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     #time
     temp = soup.find(attrs={"class":"footer"})
     if temp :
-        timeStr = re.compile("\d?\d:\d\d\s[AP]M").findall(repr(temp))[0]
+        #Sometimes it's "5:38:59 PM" instead of "5:38 PM", maybe depending on theme?
+        #So let's parse out the time str by DOM
+        #(old version)timeStr = re.compile("\d?\d:\d\d\s[AP]M").findall(repr(temp))[0]
+        timeStr = temp.contents[0].string
         i['date']+= (' '+timeStr)
         i['date'] = datetime.strptime(i['date'],datetimePattern)
         logging.debug("found time %s",i['date'])
@@ -111,7 +114,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
         logging.debug("No category")
     
     #previous entry link
-    temp = soup.find(id='ctl00_MainContentPlaceholder_ctl00_Toolbar_Internal_LeftToolbarList');
+    temp = soup.find(id='ctl00_MainContentPlaceholder_ctl01_Toolbar_Internal_RightToolbarList');
     if temp and temp.li :
         i['permalLink'] = temp.li.a['href']
         logging.debug("found previous permalink %s",i['permalLink'])
@@ -122,7 +125,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     
         #maybe need to fetch several pages of comments
         while needFetchComments:
-            temp = soup.findAll(attrs={"class":"bvCommentText bvwordwrap"})  #a comment div
+            temp = soup.findAll(attrs={"class":"bvCommentText"})  #a comment div
             if temp :
                 for cmDiv in temp:
                     comment = {'email':'','author':'','comment':'','date':'','url':''} #make sure every key is in
@@ -167,7 +170,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                 ajaxNextPageFlag = ajaxStr.rsplit(',',4)[1][:-2] == 'true'
                 
                 #Parse ajax result
-                ajaxStrWOScripts = re.findall(r'"<ul>.*</ul>"',ajaxStr)
+                ajaxStrWOScripts = re.findall(r'"<ul.*</ul>"',ajaxStr)
                 if ajaxStrWOScripts:
                     newHTML = ajaxStrWOScripts[0]
                     newHTML = newHTML.replace('\\','')
@@ -225,8 +228,13 @@ def find1stPermalink(srcURL):
         logging.debug("trying a not so solid method");
         linkNode = soup.find(attrs={"class":"footer"}).findAll('a')[3]
     if linkNode :
-        logging.info("Found 1st Permalink %s",linkNode["href"])
-        return linkNode["href"];
+        #Update @ 2007-10-21
+    	#if the permalink is like "http://broom9.spaces.live.com/blog/cns!3EB2F0E9A1AE7429!533.entry#permalinkcns!3EB2F0E9A1AE7429!533", trim the part after the '#permalinkcns!' inclusively
+    	linkNodeHref = linkNode["href"]
+        if linkNodeHref.find('#permalinkcns!') != -1 :
+    	    linkNodeHref = linkNodeHref[0:linkNodeHref.find('#permalinkcns!')]
+        logging.info("Found 1st Permalink %s",linkNodeHref)
+        return linkNodeHref;
     else :
         logging.error("Can't find 1st Permalink")
         return False
@@ -515,7 +523,7 @@ def main():
 
 if __name__=="__main__":
     logging.basicConfig(level=logging.DEBUG,
-                    format='%(asctime)s %(name)-12s %(levelname)-8s %(message)s',
+                    format='LINE %(lineno)-4d  %(levelname)-8s %(message)s',
                     datefmt='%m-%d %H:%M',
                     filename='live-space-mover.log',
                     filemode='w');
@@ -523,7 +531,7 @@ if __name__=="__main__":
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
     # set a format which is simpler for console use
-    formatter = logging.Formatter('%(name)-12s: %(levelname)-8s %(message)s')
+    formatter = logging.Formatter('LINE %(lineno)-4d : %(levelname)-8s %(message)s')
     # tell the handler to use this format
     console.setFormatter(formatter)
     logging.getLogger('').addHandler(console)
