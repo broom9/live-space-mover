@@ -116,8 +116,10 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     #previous entry link
     temp = soup.find(id='ctl00_MainContentPlaceholder_ctl01_Toolbar_Internal_RightToolbarList');
     if temp and temp.li :
-        i['permalLink'] = temp.li.a['href']
-        logging.debug("found previous permalink %s",i['permalLink'])
+        for leftOrRightATag in temp.li.contents :
+            if leftOrRightATag.img['src'].find('~Left~')>0 :
+                i['permalLink'] = temp.li.a['href']
+                logging.debug("found previous permalink %s",i['permalLink'])
     #comments
     if mode != 'postsOnly' :
         needFetchComments = True
