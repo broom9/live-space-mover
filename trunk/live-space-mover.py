@@ -50,19 +50,15 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
         |-date
     """
     logging.debug("begin fetch page %s",url)
-    '''
-    txdata = None
-    txheaders = {   
-        'User-agent': 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.5) Gecko/20070713 Firefox/2.0.0.5',
-        'Accept-Language': 'en-us',
-        'Accept-Encoding': 'gzip, deflate, compress;q=0.9',
-        'Keep-Alive': '300',
-        'Connection': 'keep-alive',
-        'Cache-Control': 'max-age=0',
-    }    
-    '''
-    #req = urllib2.Request(url, txdata, txheaders)
-    page = urllib2.urlopen(url)
+    
+    
+       
+    
+        
+    
+    req = urllib2.Request(url)
+    req.add_header('User-agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.5) Gecko/20070713 Firefox/2.0.0.5')
+    page = urllib2.build_opener().open(req).read()
     soup = BeautifulSoup(page)
     logging.debug("fetch page successfully")
     #logging.debug("Got Page Content\n---------------\n%s",soup.prettify())
@@ -76,7 +72,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
         logging.warning("Can't find date")
         sys.exit(2)
     #time
-    temp = soup.find(attrs={"class":"footer"})
+    temp = soup.find(attrs={"class":"footerLinks"})
     if temp :
         #Sometimes it's "5:38:59 PM" instead of "5:38 PM", maybe depending on theme?
         #So let's parse out the time str by DOM
@@ -150,16 +146,17 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
             #fetch next page comments
             #for first page, find this link
             #for ajaxStr, look at ajaxNextPageFlag, that depends on a parameter returned in ajaxStr
-            nextPageCommentATag = soup.find(attrs={"title":"Click to view next 20 comments"})
-            if nextPageCommentATag or ajaxNextPageFlag:
+            # nextPageCommentATag = soup.find(attrs={"title":"Click to view next 20 comments"}) #changed to another condition after pretend to be a Firefox
+            commentDivTag = soup.find( attrs = {"bv:commentcount":re.compile('[\d]*')})
+            if (commentDivTag and int(commentDivTag['bv:commentcount'])>20 ) or ajaxNextPageFlag:
                 needFetchComments = True
                 #Make ajax request URL
                 t = Template('http://${domainname}/parts/blog/script/BlogService.fpp?cn=Microsoft.Spaces.Web.Parts.BlogPart.FireAnt.BlogService'
                              +'&mn=get_comments&d=${entryid},${commentid},1,20,Public,0,Journey,2007%2F6%2F19%207%3A30%3A22en-US2007-06-06_11.36&v=0&ptid=&a=')
                 domainname = re.compile(r'http://[\w.]+/blog').findall(url)[0][len('http://'):-len('/blog')]
                 entryid = re.compile(r'cns![\w!.]+entry').findall(url)[0][:-len('.entry')]
-                if nextPageCommentATag:
-                    commentid = re.compile(r'commentPH=cns![\w!.]+&').findall(nextPageCommentATag['href'])[0][len('commentPH='):-len('&')]
+                if commentDivTag:
+                    commentid = commentDivTag['bv:lastcns']
                 elif ajaxStr:
                     commentid= ajaxStr.rsplit(',',6)[1][1:-1]
                 ajaxURL = t.substitute(domainname = domainname,entryid = entryid, commentid = commentid)
@@ -228,7 +225,7 @@ def find1stPermalink(srcURL):
         linkNode = textNode.parent
     else :
         logging.debug("trying a not so solid method");
-        linkNode = soup.find(attrs={"class":"footer"}).findAll('a')[3]
+        linkNode = soup.find(attrs={"class":"footerLinks"}).findAll('a')[3]
     if linkNode :
         #Update @ 2007-10-21
     	#if the permalink is like "http://broom9.spaces.live.com/blog/cns!3EB2F0E9A1AE7429!533.entry#permalinkcns!3EB2F0E9A1AE7429!533", trim the part after the '#permalinkcns!' inclusively
