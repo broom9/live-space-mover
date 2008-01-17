@@ -33,7 +33,13 @@ categories = set([])
 commentId = 10000
 entryId = 10000
 
-    
+
+def replaceUnicodeNumbers(text):
+    rx = re.compile('&#[0-9]+;')
+    def one_xlat(match):
+        return unichr(int(match.group(0)[2:-1]))
+    return rx.sub(one_xlat, text)
+        
 def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     """
     Structure of entryid
@@ -95,14 +101,14 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     #title
     temp = temp.findPreviousSibling()
     if temp and temp.string:
-       i['title']=temp.string.strip()
+       i['title']=replaceUnicodeNumbers(temp.string.strip())
        logging.debug("found title %s",i['title'])
     else:
         logging.warning("Can't find title")
     #category
     temp = soup.find(id='blogCategory0')
     if temp :
-       i['category']=temp.string.strip()
+       i['category']=replaceUnicodeNumbers(temp.string.strip())
        logging.debug("found category %s",i['category'])
        global categories
        categories.add(i['category'])
@@ -134,9 +140,9 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                         mailAndName = mailAndName.contents[0]
                     if isinstance(mailAndName,Tag):
                         comment['email']=mailAndName['href'][len('mailto:'):]
-                        comment['author']=u''+mailAndName.string
+                        comment['author']=replaceUnicodeNumbers(u''+mailAndName.string)
                     else:
-                        comment['author']= u''+mailAndName.string
+                        comment['author']= replaceUnicodeNumbers(u''+mailAndName.string)
                     comment['comment']=u''.join(map(CData,cmDiv.contents[1].contents))
                     comment['date']=datetime.strptime(cmDiv.contents[2],datetimePattern).strftime("%Y-%m-%d %H:%M")
                     urlTag = cmDiv.contents[2].findNextSibling(name='a')
@@ -294,7 +300,7 @@ def exportHead(f,dic,categories=[]):
 	<generator>Live Space Mover 1.0</generator>
 	<language>en</language>
 """) #need blogTitle, nowTime, blogURL
-    catT = Template(u'''<wp:category><wp:category_nicename>${category}</wp:category_nicename><wp:category_parent></wp:category_parent><wp:posts_private>0</wp:posts_private><wp:links_private>0</wp:links_private><wp:cat_name><![CDATA[${category}]]></wp:cat_name></wp:category>\n''')
+    catT = Template(u'''<wp:category><wp:cat_name><![CDATA[${category}]]></wp:cat_name></wp:category>\n''')
     catStr = u''
     for cat in categories:
         catStr+=catT.substitute(category=cat)
@@ -346,6 +352,8 @@ ${comments}
     for comment in entry['comments']:
         commentsStr+=commentT.substitute(commentId = commentId,commentAuthor = comment['author'], commentEmail = comment['email'],commentURL = comment['url'],commentDate=comment['date'],commentContent=comment['comment'])
         commentId-=1
+        #logging.debug(comment['comment'])
+    #logging.debug(entry['category'])
     itemStr = itemT.substitute(entryTitle=entry['title'],entryURL='',entryAuthor=user, category=entry['category'],entryContent=entry['content'],entryId=entryId,postDate=entry['date'].strftime('%Y-%m-%d %H:%M'),comments=commentsStr)
     entryId-=1
     #logging.debug(itemStr)
