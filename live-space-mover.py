@@ -27,6 +27,7 @@ from optparse import OptionParser
 from string import Template
 import pickle
 import xml
+from xml.sax import saxutils
 
 entries = []
 categories = set([])
@@ -123,72 +124,86 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                 i['permalLink'] = temp.li.a['href']
                 logging.debug("found previous permalink %s",i['permalLink'])
     #comments
-    if mode != 'postsOnly' :
-        needFetchComments = True
-        ajaxNextPageFlag = False
-    
-        #maybe need to fetch several pages of comments
-        while needFetchComments:
-            temp = soup.findAll(attrs={"class":"bvCommentText"})  #a comment div
-            if temp :
-                for cmDiv in temp:
-                    comment = {'email':'','author':'','comment':'','date':'','url':''} #make sure every key is in
-                    #logging.debug('Comment Div content\n %s', cmDiv)
-                    #the name and email element. The first page is different from latter pages, latter ones have one more "span" element
-                    mailAndName = cmDiv.contents[0]
-                    if isinstance(mailAndName,Tag) and mailAndName.name == 'span' :
-                        mailAndName = mailAndName.contents[0]
-                    if isinstance(mailAndName,Tag):
-                        comment['email']=mailAndName['href'][len('mailto:'):]
-                        comment['author']=replaceUnicodeNumbers(u''+mailAndName.string)
-                    else:
-                        comment['author']= replaceUnicodeNumbers(u''+mailAndName.string)
-                    comment['comment']=u''.join(map(CData,cmDiv.contents[1].contents))
-                    comment['date']=datetime.strptime(cmDiv.contents[2],datetimePattern).strftime("%Y-%m-%d %H:%M")
-                    urlTag = cmDiv.contents[2].findNextSibling(name='a')
-                    if urlTag:
-                        comment['url']=urlTag['href']
-                    i['comments'].append(comment)
-            #fetch next page comments
-            #for first page, find this link
-            #for ajaxStr, look at ajaxNextPageFlag, that depends on a parameter returned in ajaxStr
-            # nextPageCommentATag = soup.find(attrs={"title":"Click to view next 20 comments"}) #changed to another condition after pretend to be a Firefox
-            commentDivTag = soup.find( attrs = {"bv:commentcount":re.compile('[\d]*')})
-            if (commentDivTag and int(commentDivTag['bv:commentcount'])>20 ) or ajaxNextPageFlag:
-                needFetchComments = True
-                #Make ajax request URL
-                t = Template('http://${domainname}/parts/blog/script/BlogService.fpp?cn=Microsoft.Spaces.Web.Parts.BlogPart.FireAnt.BlogService'
-                             +'&mn=get_comments&d=${entryid},${commentid},1,20,Public,0,Journey,2007%2F6%2F19%207%3A30%3A22en-US2007-06-06_11.36&v=0&ptid=&a=')
-                domainname = re.compile(r'http://[\w.]+/blog').findall(url)[0][len('http://'):-len('/blog')]
-                entryid = re.compile(r'cns![\w!.]+entry').findall(url)[0][:-len('.entry')]
-                if commentDivTag:
-                    commentid = commentDivTag['bv:lastcns']
-                elif ajaxStr:
-                    commentid= ajaxStr.rsplit(',',6)[1][1:-1]
-                ajaxURL = t.substitute(domainname = domainname,entryid = entryid, commentid = commentid)
-                logging.debug("Fetch another page of comment from %s",ajaxURL)
-                #req = urllib2.Request(ajaxURL, txdata, txheaders)
-                ajaxStr = urllib2.urlopen(ajaxURL).read()
-                #logging.debug('Got comments by ajax, raw text is\n %s',ajaxStr)
-                #set ajaxNextPageFlag
-                
-                ajaxNextPageFlag = ajaxStr.rsplit(',',4)[1][:-2] == 'true'
-                
-                #Parse ajax result
-                ajaxStrWOScripts = re.findall(r'"<ul.*</ul>"',ajaxStr)
-                if ajaxStrWOScripts:
-                    newHTML = ajaxStrWOScripts[0]
-                    newHTML = newHTML.replace('\\','')
-                    soup = BeautifulSoup(newHTML)
+    try:
+        if mode != 'postsOnly' :
+            needFetchComments = True
+            ajaxNextPageFlag = False
+        
+            #maybe need to fetch several pages of comments
+            while needFetchComments:
+                temp = soup.findAll(attrs={"class":"bvCommentText"})  #a comment div
+                if temp :
+                    for cmDiv in temp:
+                        comment = {'email':'','author':'','comment':'','date':'','url':''} #make sure every key is in
+                        #logging.debug('Comment Div content\n %s', cmDiv)
+                        #the name and email element. The first page is different from latter pages, latter ones have one more "span" element
+                        mailAndName = cmDiv.contents[0].contents[0]
+                        if isinstance(mailAndName,Tag) and mailAndName.name == 'span' :
+                            mailAndName = mailAndName.contents[0]
+                        if isinstance(mailAndName,Tag):
+                            comment['email']=mailAndName['href'][len('mailto:'):]
+                            comment['author']=replaceUnicodeNumbers(u''+mailAndName.string)
+                        else:
+                            comment['author']= replaceUnicodeNumbers(u''+mailAndName.string)
+                        comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"ccViewComment"}).contents))
+                        comment['date']=datetime.strptime(cmDiv.contents[1].string,datetimePattern).strftime("%Y-%m-%d %H:%M")
+                        urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
+                        if urlTag:
+                            comment['url']=urlTag.find('a')['href']
+                        i['comments'].append(comment)
+                #fetch next page comments
+                #for first page, find this link
+                # nextPageCommentATag = soup.find(attrs={"title":"Click to view next 20 comments"}) #changed to another condition after pretend to be a Firefox
+                #for ajaxStr, look at ajaxNextPageFlag, that depends on a parameter returned in ajaxStr
+                commentDivTag = soup.find( attrs = {"bv:commentcount":re.compile('[\d]*')})
+                if (commentDivTag and int(commentDivTag['bv:commentcount'])>20 ) or ajaxNextPageFlag:
+                    needFetchComments = True
+                    #Make ajax request URL
+                    t = Template('http://${domainname}/parts/blog/script/BlogService.fpp?cn=Microsoft.Spaces.Web.Parts.BlogPart.FireAnt.BlogService'
+                                 +'&mn=get_comments&d=${entryid},${commentid},1,20,Public,0,Journey,2007%2F6%2F19%207%3A30%3A22en-US2007-06-06_11.36&v=0&ptid=&a=')
+                    t = Template('http://broom9.spaces.live.com/parts/sharedcontrols/CommentControl/CommentsService.fpp?cn=Microsoft.Spaces.Web.Controls.CommentsService'+
+                                 '&mn=get_comments&d=%22${commentid}%22,%22%22,null,20,%22Last%22,%22Wide%22,%22Descending%22,%22Blogs%22,%220%22,False,False,'+
+                                 '%22Journey%22,%2212%2F26%2F2007%209%5C%3A02%5C%3A29%20AMen-US2008-02-07_16.56%22&v=2&ptid=0&a=&au=undefined')
+                    domainname = re.compile(r'http://[\w.]+/blog').findall(url)[0][len('http://'):-len('/blog')]
+                    #entryid = re.compile(r'cns![\w!.]+entry').findall(url)[0][:-len('.entry')]
+                    if commentDivTag:
+                        commentid = commentDivTag['bv:cns']
+                    elif ajaxStr:
+                        commentid= ajaxStr.rsplit(',',6)[1][1:-1]
+                    #ajaxURL = t.substitute(domainname = domainname,entryid = entryid, commentid = commentid)
+                    ajaxURL = t.substitute(domainname = domainname,commentid = commentid)
+                    logging.debug("Fetch another page of comment from %s",ajaxURL)
+                    #req = urllib2.Request(ajaxURL, txdata, txheaders)
+                    ajaxStr = urllib2.urlopen(ajaxURL).read()
+                    #logging.debug('Got comments by ajax, raw text is\n %s',ajaxStr)
+                    #set ajaxNextPageFlag
+                    
+                    ajaxNextPageFlag = ajaxStr.rsplit(',',4)[1][:-2] == 'true'
+                    
+                    #Parse ajax result
+                    ajaxStrWOScripts = re.findall(r'"<ul.*</ul>"',ajaxStr)
+                    if ajaxStrWOScripts:
+                        newHTML = ajaxStrWOScripts[0]
+                        newHTML = newHTML.replace('\\','')
+                        soup = BeautifulSoup(newHTML)
+                    else :
+                        logging.error('Error when parsing ajax result ')
+                        logging.error(ajaxStr)
+                        sys.exit(2)
                 else :
-                    logging.error('Error when parsing ajax result ')
-                    logging.error(ajaxStr)
-                    sys.exit(2)
-            else :
-                needFetchComments = False
-        logging.debug('Got %d comments of this entry'
-                  ,len(i['comments']))
-    return i
+                    needFetchComments = False
+            logging.debug('Got %d comments of this entry'
+                      ,len(i['comments']))
+        return i
+    except:
+        logging.debug("===============Fetching Comments Error, Dump Variables================")
+        logging.debug("-- cmDiv")
+        logging.debug(cmDiv.prettify())        
+        logging.debug("-- soup")
+        #logging.debug(soup.prettify())        
+        logging.debug("======================================================================")
+        logging.error("HTML parsing error, probably because of updating of live space, please email the log file to me: weiwei9@gmail.com")
+        raise
     
 def getDstBlogEntryList(server, user, passw, maxPostID = 100):
     logging.info('Fetching dst blog entry list')
@@ -304,6 +319,7 @@ def exportHead(f,dic,categories=[]):
     catStr = u''
     for cat in categories:
         catStr+=catT.substitute(category=cat)
+    dic['blogTitle'] = saxutils.escape(dic['blogTitle'])
     f.write(t.substitute(dic))
     f.write(catStr)
     
@@ -350,11 +366,17 @@ ${comments}
     commentsStr = u""
     #logging.debug(entry)
     for comment in entry['comments']:
-        commentsStr+=commentT.substitute(commentId = commentId,commentAuthor = comment['author'], commentEmail = comment['email'],commentURL = comment['url'],commentDate=comment['date'],commentContent=comment['comment'])
+        commentsStr+=commentT.substitute(commentId = commentId,
+            commentAuthor = saxutils.escape(comment['author']),
+            commentEmail = saxutils.escape(comment['email']),
+            commentURL = comment['url'],
+            commentDate=comment['date'],
+            commentContent=comment['comment'])
         commentId-=1
         #logging.debug(comment['comment'])
     #logging.debug(entry['category'])
-    itemStr = itemT.substitute(entryTitle=entry['title'],entryURL='',entryAuthor=user, category=entry['category'],entryContent=entry['content'],entryId=entryId,postDate=entry['date'].strftime('%Y-%m-%d %H:%M'),comments=commentsStr)
+    itemStr = itemT.substitute(entryTitle=saxutils.escape(entry['title']),
+        entryURL='',entryAuthor=user, category=entry['category'],entryContent=entry['content'],entryId=entryId,postDate=entry['date'].strftime('%Y-%m-%d %H:%M'),comments=commentsStr)
     entryId-=1
     #logging.debug(itemStr)
     f.write(itemStr)
