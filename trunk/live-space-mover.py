@@ -161,7 +161,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                     #Make ajax request URL
                     t = Template('http://${domainname}/parts/blog/script/BlogService.fpp?cn=Microsoft.Spaces.Web.Parts.BlogPart.FireAnt.BlogService'
                                  +'&mn=get_comments&d=${entryid},${commentid},1,20,Public,0,Journey,2007%2F6%2F19%207%3A30%3A22en-US2007-06-06_11.36&v=0&ptid=&a=')
-                    t = Template('http://broom9.spaces.live.com/parts/sharedcontrols/CommentControl/CommentsService.fpp?cn=Microsoft.Spaces.Web.Controls.CommentsService'+
+                    t = Template('http://${domainname}/parts/sharedcontrols/CommentControl/CommentsService.fpp?cn=Microsoft.Spaces.Web.Controls.CommentsService'+
                                  '&mn=get_comments&d=%22${commentid}%22,%22%22,null,20,%22Last%22,%22Wide%22,%22Descending%22,%22Blogs%22,%220%22,False,False,'+
                                  '%22Journey%22,%2212%2F26%2F2007%209%5C%3A02%5C%3A29%20AMen-US2008-02-07_16.56%22&v=2&ptid=0&a=&au=undefined')
                     domainname = re.compile(r'http://[\w.]+/blog').findall(url)[0][len('http://'):-len('/blog')]
