@@ -68,7 +68,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     page = urllib2.build_opener().open(req).read()
     soup = BeautifulSoup(page)
     logging.debug("fetch page successfully")
-    #logging.debug("Got Page Content\n---------------\n%s",soup.prettify())
+    logging.debug("Got Page Content\n---------------\n%s",soup.prettify())
     i={'date':'','title':'','content':'','category':'','permalLink':'','comments':[]}
     #date
     temp = soup.find(id=re.compile('LastMDatecns[!0-9]+'))
@@ -137,16 +137,16 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                         comment = {'email':'','author':'','comment':'','date':'','url':''} #make sure every key is in
                         #logging.debug('Comment Div content\n %s', cmDiv)
                         #the name and email element. The first page is different from latter pages, latter ones have one more "span" element
-                        mailAndName = cmDiv.contents[0].contents[0]
-                        if isinstance(mailAndName,Tag) and mailAndName.name == 'span' :
+                        mailAndName = cmDiv.find(id=re.compile('ccNamecns[!0-9]+'))
+                        if len(mailAndName.contents) > 0:
                             mailAndName = mailAndName.contents[0]
-                        if isinstance(mailAndName,Tag):
-                            comment['email']=mailAndName['href'][len('mailto:'):]
-                            comment['author']=replaceUnicodeNumbers(u''+mailAndName.string)
-                        else:
-                            comment['author']= replaceUnicodeNumbers(u''+mailAndName.string)
+                            if isinstance(mailAndName,Tag):
+                                comment['email']=mailAndName['href'][len('mailto:'):]
+                                comment['author']=replaceUnicodeNumbers(u''+mailAndName.string)
+                            else:
+                                comment['author']= replaceUnicodeNumbers(u''+mailAndName.string)
                         comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"ccViewComment"}).contents))
-                        comment['date']=datetime.strptime(cmDiv.contents[1].string,datetimePattern).strftime("%Y-%m-%d %H:%M")
+                        comment['date']=datetime.strptime(cmDiv.find(id=re.compile('ccDatecns[!0-9]+')).string,datetimePattern).strftime("%Y-%m-%d %H:%M")
                         urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
                         if urlTag:
                             comment['url']=urlTag.find('a')['href']
