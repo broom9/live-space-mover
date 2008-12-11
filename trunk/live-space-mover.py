@@ -119,8 +119,8 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     #previous entry link
     temp = soup.find(id='ctl00_MainContentPlaceholder_ctl01_Toolbar_Internal_RightToolbarList');
     if temp and temp.li :
-        for leftOrRightATag in temp.li.contents :
-            if leftOrRightATag.img['src'].find('~Left~')>0 :
+        for leftOrRightATag in temp.li.findAll('a') :
+            if leftOrRightATag.contents[0].find('Previous')>0 :
                 i['permalLink'] = temp.li.a['href']
                 logging.debug("found previous permalink %s",i['permalLink'])
     #comments
@@ -131,25 +131,19 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
         
             #maybe need to fetch several pages of comments
             while needFetchComments:
-                temp = soup.findAll(attrs={"class":"bvCommentText"})  #a comment div
+                temp = soup.findAll(attrs={"class":"ccCommentBox"})  #a comment div
                 if temp :
                     for cmDiv in temp:
                         comment = {'email':'','author':'','comment':'','date':'','url':''} #make sure every key is in
                         #logging.debug('Comment Div content\n %s', cmDiv)
                         #the name and email element. The first page is different from latter pages, latter ones have one more "span" element
-                        mailAndName = cmDiv.find(id=re.compile('ccNamecns[!0-9]+'))
-                        if len(mailAndName.contents) > 0:
-                            mailAndName = mailAndName.contents[0]
-                            if isinstance(mailAndName,Tag):
-                                comment['email']=mailAndName['href'][len('mailto:'):]
-                                comment['author']=replaceUnicodeNumbers(u''+mailAndName.string)
-                            else:
-                                comment['author']= replaceUnicodeNumbers(u''+mailAndName.string)
-                        comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"ccViewComment"}).contents))
-                        comment['date']=datetime.strptime(cmDiv.find(id=re.compile('ccDatecns[!0-9]+')).string,datetimePattern).strftime("%Y-%m-%d %H:%M")
-                        urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
-                        if urlTag:
-                            comment['url']=urlTag.find('a')['href']
+                        comment_author = cmDiv.find(attrs={"class":"cxp_ic_name"}) or cmDiv.find(attrs={"class":"ccName"})
+                        comment_author = replaceUnicodeNumbers(u'' + comment_author.span.string)
+                        comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"Comment"}).contents))
+                        # comment['date']=datetime.strptime(cmDiv.find(attrs={"class":"ccDateBox"}).span.string,datetimePattern).strftime("%Y-%m-%d %H:%M")
+                        # urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
+                        # if urlTag:
+                        #    comment['url']=urlTag.find('a')['href']
                         i['comments'].append(comment)
                 #fetch next page comments
                 #for first page, find this link
@@ -528,7 +522,7 @@ def main():
     blogInfoDic['nowTime']=datetime.now().strftime('%Y-%m-%d %H:%M')
     page = urllib2.urlopen(blogInfoDic['blogURL'])
     soup = BeautifulSoup(page)
-    blogInfoDic['blogTitle']=soup.h1.string
+    blogInfoDic['blogTitle']=u'' + soup.find(id='navTitle').span.string
     logging.debug('Blog Title is %s',blogInfoDic['blogTitle'])
     exportFileName = 'export_'+datetime.now().strftime('%m%d%Y-%H%M')+'.xml'
     f = codecs.open(exportFileName,'w','utf-8')
