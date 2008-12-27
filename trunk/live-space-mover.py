@@ -42,7 +42,7 @@ def replaceUnicodeNumbers(text):
         return unichr(int(match.group(0)[2:-1]))
     return rx.sub(one_xlat, text)
 
-def parseCommentDate(dateStr):
+def parseCommentDate(dateStr, postDate = datetime.today()):
   """
   Parse date string in comments
   examples:
@@ -65,7 +65,7 @@ def parseCommentDate(dateStr):
     monthAbbr = m2.group(1)[0:3]
     month = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,"Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}[monthAbbr]
     day = int(m2.group(2))
-    return datetime.today().replace(month=month, day=day)
+    return postDate.replace(month=month, day=day)
   else:
     raise Exception, "Can't parse comment date string " + dateStr
 
@@ -166,7 +166,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                         comment_author = cmDiv.find(attrs={"class":"cxp_ic_name"}) or cmDiv.find(attrs={"class":"ccName"})
                         comment_author = replaceUnicodeNumbers(u'' + comment_author.span.string)
                         comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"Comment"}).contents))
-                        comment['date']=parseCommentDate(cmDiv.findNextSiblings(attrs={"class":re.compile("ccDateBox")})[0].span.string).strftime("%Y-%m-%d %H:%M")
+                        comment['date']=parseCommentDate(cmDiv.findNextSiblings(attrs={"class":re.compile("ccDateBox")})[0].span.string, i['date']).strftime("%Y-%m-%d %H:%M")
                         # urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
                         # if urlTag:
                         #    comment['url']=urlTag.find('a')['href']
