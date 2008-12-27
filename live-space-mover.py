@@ -22,6 +22,7 @@ from BeautifulSoup import BeautifulSoup,Tag,CData
 import re
 import logging
 from datetime import datetime
+from datetime import timedelta
 import time
 from optparse import OptionParser
 from string import Template
@@ -40,6 +41,39 @@ def replaceUnicodeNumbers(text):
     def one_xlat(match):
         return unichr(int(match.group(0)[2:-1]))
     return rx.sub(one_xlat, text)
+
+def parseCommentDate(dateStr):
+  """
+  Parse date string in comments
+  examples:
+    5 seconds ago
+    1 minute ago
+    4 hours ago
+    1 day ago
+    Nov. 6
+    Sept. 27
+  """
+  m = re.compile('^(\d+) (second|minute|hour|day)s? ago').match(dateStr) 
+  m2 = re.compile('^(\w+\.?) (\d+)').match(dateStr) 
+  if m :
+    secondsOfUnit = {"second":1, "minute":60, "hour":60*60, "day":24*60*60}
+    num = int(m.group(1))
+    unit = m.group(2)
+    d = timedelta(seconds = num * secondsOfUnit[unit])
+    return datetime.today() - d
+  elif m2 :
+    monthAbbr = m2.group(1)[0:3]
+    month = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,"Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}[monthAbbr]
+    day = int(m2.group(2))
+    return datetime.today().replace(month=month, day=day)
+  else:
+    raise Exception, "Can't parse comment date string " + dateStr
+
+def testParseCommentDate():
+  test_d_strs = ["5 seconds ago","1 minute ago","4 hours ago","1 day ago","Nov. 6", "Sept. 27"]
+  for s in test_d_strs:
+    print parseCommentDate(s)
+    
         
 def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     """
@@ -57,12 +91,6 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
         |-date
     """
     logging.debug("begin fetch page %s",url)
-    
-    
-       
-    
-        
-    
     req = urllib2.Request(url)
     req.add_header('User-agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.5) Gecko/20070713 Firefox/2.0.0.5')
     page = urllib2.build_opener().open(req).read()
@@ -127,8 +155,6 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     try:
         if mode != 'postsOnly' :
             needFetchComments = True
-            ajaxNextPageFlag = False
-        
             #maybe need to fetch several pages of comments
             while needFetchComments:
                 temp = soup.findAll(attrs={"class":"ccCommentBox"})  #a comment div
@@ -140,52 +166,22 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                         comment_author = cmDiv.find(attrs={"class":"cxp_ic_name"}) or cmDiv.find(attrs={"class":"ccName"})
                         comment_author = replaceUnicodeNumbers(u'' + comment_author.span.string)
                         comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"Comment"}).contents))
-                        # comment['date']=datetime.strptime(cmDiv.find(attrs={"class":"ccDateBox"}).span.string,datetimePattern).strftime("%Y-%m-%d %H:%M")
+                        comment['date']=parseCommentDate(cmDiv.findNextSiblings(attrs={"class":re.compile("ccDateBox")})[0].span.string).strftime("%Y-%m-%d %H:%M")
                         # urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
                         # if urlTag:
                         #    comment['url']=urlTag.find('a')['href']
                         i['comments'].append(comment)
                 #fetch next page comments
                 #for first page, find this link
-                # nextPageCommentATag = soup.find(attrs={"title":"Click to view next 20 comments"}) #changed to another condition after pretend to be a Firefox
-                #for ajaxStr, look at ajaxNextPageFlag, that depends on a parameter returned in ajaxStr
-                commentDivTag = soup.find( attrs = {"bv:commentcount":re.compile('[\d]*')})
-                if (commentDivTag and int(commentDivTag['bv:commentcount'])>20 ) or ajaxNextPageFlag:
-                    needFetchComments = True
-                    #Make ajax request URL
-                    t = Template('http://${domainname}/parts/blog/script/BlogService.fpp?cn=Microsoft.Spaces.Web.Parts.BlogPart.FireAnt.BlogService'
-                                 +'&mn=get_comments&d=${entryid},${commentid},1,20,Public,0,Journey,2007%2F6%2F19%207%3A30%3A22en-US2007-06-06_11.36&v=0&ptid=&a=')
-                    t = Template('http://${domainname}/parts/sharedcontrols/CommentControl/CommentsService.fpp?cn=Microsoft.Spaces.Web.Controls.CommentsService'+
-                                 '&mn=get_comments&d=%22${commentid}%22,%22%22,null,20,%22Last%22,%22Wide%22,%22Descending%22,%22Blogs%22,%220%22,False,False,'+
-                                 '%22Journey%22,%2212%2F26%2F2007%209%5C%3A02%5C%3A29%20AMen-US2008-02-07_16.56%22&v=2&ptid=0&a=&au=undefined')
-                    domainname = re.compile(r'http://[\w.\-]+/blog').findall(url)[0][len('http://'):-len('/blog')]
-                    #entryid = re.compile(r'cns![\w!.]+entry').findall(url)[0][:-len('.entry')]
-                    if commentDivTag:
-                        commentid = commentDivTag['bv:cns']
-                    elif ajaxStr:
-                        commentid= ajaxStr.rsplit(',',6)[1][1:-1]
-                    #ajaxURL = t.substitute(domainname = domainname,entryid = entryid, commentid = commentid)
-                    ajaxURL = t.substitute(domainname = domainname,commentid = commentid)
-                    logging.debug("Fetch another page of comment from %s",ajaxURL)
-                    #req = urllib2.Request(ajaxURL, txdata, txheaders)
-                    ajaxStr = urllib2.urlopen(ajaxURL).read()
-                    #logging.debug('Got comments by ajax, raw text is\n %s',ajaxStr)
-                    #set ajaxNextPageFlag
-                    
-                    ajaxNextPageFlag = ajaxStr.rsplit(',',4)[1][:-2] == 'true'
-                    
-                    #Parse ajax result
-                    ajaxStrWOScripts = re.findall(r'"<ul.*</ul>"',ajaxStr)
-                    if ajaxStrWOScripts:
-                        newHTML = ajaxStrWOScripts[0]
-                        newHTML = newHTML.replace('\\','')
-                        soup = BeautifulSoup(newHTML)
-                    else :
-                        logging.error('Error when parsing ajax result ')
-                        logging.error(ajaxStr)
-                        sys.exit(2)
+                nextPageCommentATag = soup.find(id="sn_ccpgNextCommentControl")
+                if nextPageCommentATag :
+                  needFetchComments = True
+                  req = urllib2.Request(nextPageCommentATag["href"])
+                  req.add_header('User-agent', 'Mozilla/5.0 (Windows; U; Windows NT 5.1; en-US; rv:1.8.1.5) Gecko/20070713 Firefox/2.0.0.5')
+                  page = urllib2.build_opener().open(req).read()
+                  soup = BeautifulSoup(page)
                 else :
-                    needFetchComments = False
+                  needFetchComments = False
             logging.debug('Got %d comments of this entry'
                       ,len(i['comments']))
         return i
@@ -563,7 +559,3 @@ if __name__=="__main__":
     except:
         logging.exception("Unexpected error")
         raise
-
-    
-    
-
