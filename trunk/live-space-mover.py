@@ -164,7 +164,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                         #logging.debug('Comment Div content\n %s', cmDiv)
                         #the name and email element. The first page is different from latter pages, latter ones have one more "span" element
                         comment_author = cmDiv.find(attrs={"class":"cxp_ic_name"}) or cmDiv.find(attrs={"class":"ccName"})
-                        comment_author = replaceUnicodeNumbers(u'' + comment_author.span.string)
+                        comment['author'] = replaceUnicodeNumbers(u'' + comment_author.span.string)
                         comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"Comment"}).contents))
                         comment['date']=parseCommentDate(cmDiv.findNextSiblings(attrs={"class":re.compile("ccDateBox")})[0].span.string, i['date']).strftime("%Y-%m-%d %H:%M")
                         # urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
