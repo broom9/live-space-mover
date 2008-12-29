@@ -96,7 +96,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     page = urllib2.build_opener().open(req).read()
     soup = BeautifulSoup(page)
     logging.debug("fetch page successfully")
-    logging.debug("Got Page Content\n---------------\n%s",soup.prettify())
+    #logging.debug("Got Page Content\n---------------\n%s",soup.prettify())
     i={'date':'','title':'','content':'','category':'','permalLink':'','comments':[]}
     #date
     temp = soup.find(id=re.compile('LastMDatecns[!0-9]+'))
@@ -114,6 +114,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
         #(old version)timeStr = re.compile("\d?\d:\d\d\s[AP]M").findall(repr(temp))[0]
         timeStr = temp.contents[0].string
         i['date']+= (' '+timeStr)
+	logging.debug("found timeStr is %s", i['date'])
         i['date'] = datetime.strptime(i['date'],datetimePattern)
         logging.debug("found time %s",i['date'])
     else :
@@ -330,7 +331,7 @@ def exportEntry(f,entry,user):
     itemT = Template(u"""<item>
 <title>${entryTitle}</title>
 <link>${entryURL}</link>
-<pubDate>Tue, 30 Nov 1999 00:00:00 +0000</pubDate>
+<pubDate>${pubDate}</pubDate>
 <dc:creator>${entryAuthor}</dc:creator>
 
 		<category><![CDATA[${category}]]></category>
@@ -350,7 +351,7 @@ def exportEntry(f,entry,user):
 <wp:post_type>post</wp:post_type>
 ${comments}
 </item>
-""") #need entryTitle, entryURL, entryAuthor, category, entryContent, entryId, postDate
+""") #need entryTitle, entryURL, entryAuthor, category, entryContent, entryId, postDate, pubDate
     global entryId
     global commentId
     commentsStr = u""
@@ -366,7 +367,9 @@ ${comments}
         #logging.debug(comment['comment'])
     #logging.debug(entry['category'])
     itemStr = itemT.substitute(entryTitle=saxutils.escape(entry['title']),
-        entryURL='',entryAuthor=user, category=entry['category'],entryContent=entry['content'],entryId=entryId,postDate=entry['date'].strftime('%Y-%m-%d %H:%M'),comments=commentsStr)
+        entryURL='',entryAuthor=user, category=entry['category'],entryContent=entry['content'],
+	entryId=entryId,postDate=entry['date'].strftime('%Y-%m-%d %H:%M'),pubDate=entry['date'].strftime('%a, %d %b %Y %H:%M:%S +0000'),
+	comments=commentsStr)
     entryId-=1
     #logging.debug(itemStr)
     f.write(itemStr)
@@ -518,7 +521,7 @@ def main():
     blogInfoDic['nowTime']=datetime.now().strftime('%Y-%m-%d %H:%M')
     page = urllib2.urlopen(blogInfoDic['blogURL'])
     soup = BeautifulSoup(page)
-    blogInfoDic['blogTitle']=u'' + soup.find(id='navTitle').span.string
+    blogInfoDic['blogTitle']= replaceUnicodeNumbers(u'' + soup.find(id='navTitle').span.string)
     logging.debug('Blog Title is %s',blogInfoDic['blogTitle'])
     exportFileName = 'export_'+datetime.now().strftime('%m%d%Y-%H%M')+'.xml'
     f = codecs.open(exportFileName,'w','utf-8')
