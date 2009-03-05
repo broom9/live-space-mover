@@ -183,13 +183,14 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                   soup = BeautifulSoup(page)
                 else :
                   needFetchComments = False
+            i['comments'].reverse() # bug reported by Sun Yue
             logging.debug('Got %d comments of this entry'
                       ,len(i['comments']))
         return i
     except:
         logging.debug("===============Fetching Comments Error, Dump Variables================")
         logging.debug("-- cmDiv")
-        logging.debug(cmDiv.prettify())        
+        # logging.debug(cmDiv.prettify())        
         logging.debug("-- soup")
         #logging.debug(soup.prettify())        
         logging.debug("======================================================================")
