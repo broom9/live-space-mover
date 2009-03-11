@@ -167,7 +167,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                         comment_author = cmDiv.find(attrs={"class":"cxp_ic_name"}) or cmDiv.find(attrs={"class":"ccName"})
                         comment['author'] = replaceUnicodeNumbers(u''.join(comment_author.findAll(text=True)))
                         comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"Comment"}).contents))
-                        comment['date']=parseCommentDate(cmDiv.findNextSiblings(attrs={"class":re.compile("ccDateBox")})[0].span.string, i['date']).strftime("%Y-%m-%d %H:%M")
+                        comment['date']=parseCommentDate(cmDiv.findNext(attrs={"class":re.compile("ccDateBox")}).span.string, i['date']).strftime("%Y-%m-%d %H:%M")
                         # urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
                         # if urlTag:
                         #    comment['url']=urlTag.find('a')['href']
@@ -190,9 +190,9 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
     except:
         logging.debug("===============Fetching Comments Error, Dump Variables================")
         logging.debug("-- cmDiv")
-        # logging.debug(cmDiv.prettify())        
+        logging.debug(cmDiv.prettify())        
         logging.debug("-- soup")
-        #logging.debug(soup.prettify())        
+        logging.debug(soup.prettify())        
         logging.debug("======================================================================")
         logging.error("HTML parsing error, probably because of updating of live space, please email the log file to me: weiwei9@gmail.com")
         raise
