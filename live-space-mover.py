@@ -167,7 +167,7 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
                         comment_author = cmDiv.find(attrs={"class":"cxp_ic_name"}) or cmDiv.find(attrs={"class":"ccName"})
                         comment['author'] = replaceUnicodeNumbers(u''.join(comment_author.findAll(text=True)))
                         comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"Comment"}).contents))
-                        comment['date']=parseCommentDate(cmDiv.findNext(attrs={"class":re.compile("ccDateBox")}).span.string, i['date']).strftime("%Y-%m-%d %H:%M")
+                        comment['date']=parseCommentDate(cmDiv.findNext(attrs={"class":re.compile("ccDateBox")}).span.string, i['date']).strftime("%Y-%m-%d %H:%M:%S")
                         # urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
                         # if urlTag:
                         #    comment['url']=urlTag.find('a')['href']
@@ -369,8 +369,8 @@ ${comments}
     #logging.debug(entry['category'])
     itemStr = itemT.substitute(entryTitle=saxutils.escape(entry['title']),
         entryURL='',entryAuthor=user, category=entry['category'],entryContent=entry['content'],
-	entryId=entryId,postDate=entry['date'].strftime('%Y-%m-%d %H:%M'),pubDate=entry['date'].strftime('%a, %d %b %Y %H:%M:%S +0000'),
-	comments=commentsStr)
+        entryId=entryId,postDate=entry['date'].strftime('%Y-%m-%d %H:%M:%S'),pubDate=entry['date'].strftime('%a, %d %b %Y %H:%M:%S +0000'),
+        comments=commentsStr)
     entryId-=1
     #logging.debug(itemStr)
     f.write(itemStr)
