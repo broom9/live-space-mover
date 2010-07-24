@@ -53,8 +53,8 @@ def parseCommentDate(dateStr, postDate = datetime.today()):
     Nov. 6
     Sept. 27
   """
-  m = re.compile('^(\d+) (second|minute|hour|day)s? ago').match(dateStr) 
-  m2 = re.compile('^(\w+\.?) (\d+)').match(dateStr) 
+  m = re.compile('^ - (\d+) (second|minute|hour|day)s? ago').match(dateStr) 
+  m2 = re.compile('^ - (\w+\.?) (\d+)(\, \d+ ?)?').match(dateStr) 
   if m :
     secondsOfUnit = {"second":1, "minute":60, "hour":60*60, "day":24*60*60}
     num = int(m.group(1))
@@ -65,7 +65,11 @@ def parseCommentDate(dateStr, postDate = datetime.today()):
     monthAbbr = m2.group(1)[0:3]
     month = {"Jan":1,"Feb":2,"Mar":3,"Apr":4,"May":5,"Jun":6,"Jul":7,"Aug":8,"Sep":9,"Oct":10,"Nov":11,"Dec":12}[monthAbbr]
     day = int(m2.group(2))
-    return postDate.replace(month=month, day=day)
+    if m2.group(3):
+      year = int(m2.group(3)[2:6])
+    else:
+      year = datetime.today().year
+    return datetime.today().replace(day=day, month=month, year=year)
   else:
     raise Exception, "Can't parse comment date string " + dateStr
 
@@ -158,19 +162,19 @@ def fetchEntry(url,datetimePattern = '%m/%d/%Y %I:%M %p',mode='all'):
             needFetchComments = True
             #maybe need to fetch several pages of comments
             while needFetchComments:
-                temp = soup.findAll(attrs={"class":"ccCommentBox"})  #a comment div
+                temp = soup.findAll(attrs={"class":"cc2_cmt"})  #a comment div
                 if temp :
                     for cmDiv in temp:
                         comment = {'email':'','author':'','comment':'','date':'','url':''} #make sure every key is in
                         #logging.debug('Comment Div content\n %s', cmDiv)
                         #the name and email element. The first page is different from latter pages, latter ones have one more "span" element
-                        comment_author = cmDiv.find(attrs={"class":"cxp_ic_name"}) or cmDiv.find(attrs={"class":"ccName"})
+                        comment_author = cmDiv.find(attrs={"class":"cc2_dnmmain"}) # or cmDiv.find(attrs={"class":"ccName"})
                         comment['author'] = replaceUnicodeNumbers(u''.join(comment_author.findAll(text=True)))
-                        comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"Comment"}).contents))
-                        comment['date']=parseCommentDate(cmDiv.findNext(attrs={"class":re.compile("ccDateBox")}).span.string, i['date']).strftime("%Y-%m-%d %H:%M:%S")
-                        # urlTag = cmDiv.find(attrs={"class":"ccViewAuthorUrl ltrText"})
-                        # if urlTag:
-                        #    comment['url']=urlTag.find('a')['href']
+                        comment['comment']=u''.join(map(CData,cmDiv.find(attrs={"class":"cc2_txt"}).contents))
+                        comment['date']=parseCommentDate(cmDiv.findNext(attrs={"class":"cc2_tsmain"}).string, i['date']).strftime("%Y-%m-%d %H:%M:%S")
+                        urlTag = cmDiv.find(attrs={"class":"cc2_dnmmain"})
+                        if urlTag:
+                           comment['url']=urlTag.find('a')['href']
                         i['comments'].append(comment)
                 #fetch next page comments
                 #for first page, find this link
@@ -456,7 +460,8 @@ def main():
     cacheFile = None
     #If there is a cache file, load it and resume from the last post in it
     if not startfromURL and os.path.exists('entries.cache'):
-        cacheFile = open('entries.cache','a+')
+        logging.info('Found cache file')
+        cacheFile = open('entries.cache','r')
         try:
             while True:
                 entry = pickle.load(cacheFile)
@@ -464,6 +469,8 @@ def main():
                 entries.append(entry)
         except (pickle.PickleError,EOFError):
             logging.info("No more entries in cache file for loading")
+            cacheFile.close()
+            cacheFile = open('entries.cache', 'a+')
         if len(entries)>0:
             startfromURL = entries[-1]['permalLink']
             logging.info("Will start fetching from %s",startfromURL)
@@ -484,7 +491,7 @@ def main():
         while permalink:
             i=fetchEntry(permalink,datetimepattern,mode)
             if 'title' in i:
-                logging.info("Got a blog entry titled %s successfully",i['title'])
+                logging.info("Got a blog entry titled %s with %d comments successfully",i['title'], len(i['comments']))
             if destURL:
                 wpost = {}
                 wpost['description']=i['content']
